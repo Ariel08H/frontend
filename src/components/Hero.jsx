@@ -55,20 +55,35 @@ const Hero = () => {
     });
   };
 
-  const formatEventTime = (event) => {
+  const formatEventDateOrTime = (event) => {
     const eventDate = event.date || event.last_date;
 
-    if (!eventDate) return 'No time';
+    if (!eventDate) return 'No date';
 
     const parsedDate = new Date(eventDate);
 
     if (Number.isNaN(parsedDate.getTime())) {
-      return 'Invalid time';
+      return 'Invalid date';
     }
 
-    return parsedDate.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
+    const now = new Date();
+
+    const isToday =
+      parsedDate.getDate() === now.getDate() &&
+      parsedDate.getMonth() === now.getMonth() &&
+      parsedDate.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return parsedDate.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    return parsedDate.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
   };
 
@@ -114,6 +129,7 @@ const Hero = () => {
           {loadingEvents ? (
             <div className="event-preview">
               <div className="event-dot"></div>
+
               <div>
                 <h3>Loading events...</h3>
                 <p>Please wait</p>
@@ -134,8 +150,9 @@ const Hero = () => {
 
                 <div>
                   <h3>{event.title || 'Untitled Event'}</h3>
+
                   <p>
-                    {formatEventTime(event)}
+                    {formatEventDateOrTime(event)}
                     {' • '}
                     {event.location || 'No location'}
                   </p>
@@ -145,6 +162,7 @@ const Hero = () => {
           ) : (
             <div className="event-preview">
               <div className="event-dot"></div>
+
               <div>
                 <h3>No upcoming events</h3>
                 <p>Create your first event</p>

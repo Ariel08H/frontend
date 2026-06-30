@@ -5,13 +5,12 @@ import LoginButton from './LoginButton';
 import { useUser } from '@clerk/react';
 
 const Header = () => {
-
-  const {user} = useUser();
+  const { user } = useUser();
 
   return (
     <header>
-      <Link to='/'>
-        <div className='logo'>
+      <Link to="/">
+        <div className="logo">
           Eve
           <span>n</span>
           tly
@@ -21,12 +20,11 @@ const Header = () => {
       <nav>
         <Link to="/about" className="menu__link">About</Link>
         <Link to="/create" className="menu__link">Create</Link>
+        <Link to="/favorites" className="menu__link">Favorites</Link>
 
-        {
-          user &&
+        {user && (
           <Link to="/user-events" className="menu__link">My events</Link>
-        }
-        <Link to="/showcase" className="menu__link">Showcase</Link>
+        )}
       </nav>
 
       <Show when="signed-out">

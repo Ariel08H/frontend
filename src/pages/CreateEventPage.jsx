@@ -18,12 +18,13 @@ const CreateProject = () => {
   const [location, setLocation] = useState('');
   const [isImportant, setIsImportant] = useState(false);
 
-  const [lastDate, setLastDate] = useState('');
-  const [lastTime, setLastTime] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
 
   const [pageLoading, setPageLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const splitDateTime = (dateValue) => {
     if (!dateValue) {
@@ -56,13 +57,24 @@ const CreateProject = () => {
 
   useEffect(() => {
     if (!isEditMode) return;
+    if (!isLoaded) return;
+    if (!isSignedIn) return;
 
     const fetchEventForEdit = async () => {
       try {
         setPageLoading(true);
         setErrorMsg('');
+        setAccessDenied(false);
 
         const data = await apiRequest(`/api/events/${id}`);
+
+        const loggedInUserEmail = user?.primaryEmailAddress?.emailAddress;
+        const eventCreatorEmail = data.user_email;
+
+        if (!loggedInUserEmail || loggedInUserEmail !== eventCreatorEmail) {
+          setAccessDenied(true);
+          return;
+        }
 
         setTitle(data.title || '');
         setDescription(data.description || '');
@@ -72,8 +84,8 @@ const CreateProject = () => {
         setIsImportant(Boolean(data.isImportant));
 
         const dateTimeParts = splitDateTime(data.date || data.last_date);
-        setLastDate(dateTimeParts.date);
-        setLastTime(dateTimeParts.time);
+        setEventDate(dateTimeParts.date);
+        setEventTime(dateTimeParts.time);
       } catch (error) {
         console.error('Error loading event for edit:', error);
         setErrorMsg(error.message || 'Server error while loading event');
@@ -83,24 +95,48 @@ const CreateProject = () => {
     };
 
     fetchEventForEdit();
-  }, [id, isEditMode]);
+  }, [id, isEditMode, isLoaded, isSignedIn, user]);
+
+  const normalizeWebsiteUrl = (url) => {
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl) return '';
+
+    if (
+      trimmedUrl.startsWith('http://') ||
+      trimmedUrl.startsWith('https://')
+    ) {
+      return trimmedUrl;
+    }
+
+    return `https://${trimmedUrl}`;
+  };
 
   const submitForm = async (e) => {
     e.preventDefault();
 
-    const combinedLastDate =
-      lastDate && lastTime
-        ? `${lastDate}T${lastTime}`
-        : null;
+    if (
+      !title.trim() ||
+      !description.trim() ||
+      !website.trim() ||
+      !location.trim() ||
+      !eventDate ||
+      !eventTime
+    ) {
+      setErrorMsg('Please fill in all required fields.');
+      return;
+    }
+
+    const combinedEventDate = `${eventDate}T${eventTime}`;
 
     const eventData = {
       title,
       description,
       img,
-      website,
+      website: normalizeWebsiteUrl(website),
       location,
       isImportant,
-      last_date: combinedLastDate,
+      last_date: combinedEventDate,
       author: user?.fullName || 'Anonymous',
       user_email: user?.primaryEmailAddress?.emailAddress,
     };
@@ -205,6 +241,19 @@ const CreateProject = () => {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <div className="auth-status-wrapper">
+        <div className="auth-status-card">
+          <h2 className="auth-status-title">Access Denied</h2>
+          <p className="auth-status-text">
+            You cannot edit this event because it was created by another user.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="create-page">
       <div className="create-card">
@@ -237,6 +286,7 @@ const CreateProject = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell us about your event..."
+              required
             />
           </div>
 
@@ -248,6 +298,7 @@ const CreateProject = () => {
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="https://myevent.com"
+                required
               />
             </div>
 
@@ -258,26 +309,29 @@ const CreateProject = () => {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="E.g. Tel Aviv, Israel"
+                required
               />
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-div">
-              <label>Last Date</label>
+              <label>Date</label>
               <input
                 type="date"
-                value={lastDate}
-                onChange={(e) => setLastDate(e.target.value)}
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                required
               />
             </div>
 
             <div className="form-div">
-              <label>Last Time</label>
+              <label>Time</label>
               <input
                 type="time"
-                value={lastTime}
-                onChange={(e) => setLastTime(e.target.value)}
+                value={eventTime}
+                onChange={(e) => setEventTime(e.target.value)}
+                required
               />
             </div>
           </div>

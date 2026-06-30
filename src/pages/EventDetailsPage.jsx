@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useUser } from '@clerk/react';
 import { apiRequest } from '../services/api';
 
 const EventDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { favorites, setFavorites } = useOutletContext();
   const { user, isSignedIn, isLoaded } = useUser();
 
   const [event, setEvent] = useState(null);
@@ -36,34 +37,44 @@ const EventDetailsPage = () => {
     navigate(`/edit/${id}`);
   };
 
-  const handleDelete = async () => {
-  const confirmDelete = window.confirm(
-    'Are you sure you want to delete this event? This action cannot be undone.'
-  );
+  const handleFavorite = () => {
+    setFavorites((prevFavorites) => {
+      if (prevFavorites.includes(id)) {
+        return prevFavorites.filter((favoriteId) => favoriteId !== id);
+      }
 
-  if (!confirmDelete) return;
-
-  try {
-    setDeleting(true);
-
-    await apiRequest(`/api/events/delete/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_email: user?.primaryEmailAddress?.emailAddress,
-      }),
+      return [...prevFavorites, id];
     });
+  };
 
-    navigate('/');
-  } catch (error) {
-    console.error('Error deleting event:', error);
-    setErrorMsg(error.message || 'Server error while deleting event');
-  } finally {
-    setDeleting(false);
-  }
-};
+  const handleDelete = async () => {
+    const confirmDelete = window.confirm(
+      'Are you sure you want to delete this event? This action cannot be undone.'
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setDeleting(true);
+
+      await apiRequest(`/api/events/delete/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_email: user?.primaryEmailAddress?.emailAddress,
+        }),
+      });
+
+      navigate('/');
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      setErrorMsg(error.message || 'Server error while deleting event');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const formatDate = (dateValue) => {
     if (!dateValue) return 'No date';
@@ -134,6 +145,8 @@ const EventDetailsPage = () => {
     eventCreatorEmail &&
     loggedInUserEmail === eventCreatorEmail;
 
+  const isFavorite = favorites.includes(id);
+
   return (
     <main className="event-details-page">
       <section className="event-details-card">
@@ -166,26 +179,36 @@ const EventDetailsPage = () => {
               <h1>{event.title || 'Untitled Event'}</h1>
             </div>
 
-            {isEventOwner && (
-              <div className="event-actions-row">
-                <button
-                  type="button"
-                  className="edit-event-btn"
-                  onClick={handleEdit}
-                >
-                  Edit Event
-                </button>
+            <div className="event-actions-row">
+              <button
+                type="button"
+                className="favorite-event-btn"
+                onClick={handleFavorite}
+              >
+                {isFavorite ? '⭐ Favorited' : '☆ Favorite'}
+              </button>
 
-                <button
-                  type="button"
-                  className="delete-event-btn"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Deleting...' : 'Delete Event'}
-                </button>
-              </div>
-            )}
+              {isEventOwner && (
+                <>
+                  <button
+                    type="button"
+                    className="edit-event-btn"
+                    onClick={handleEdit}
+                  >
+                    Edit Event
+                  </button>
+
+                  <button
+                    type="button"
+                    className="delete-event-btn"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete Event'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <p className="event-description">

@@ -2,50 +2,58 @@ import React, { useEffect, useState } from 'react';
 import { useUser } from '@clerk/react';
 import EventPreview from './EventPreview';
 import { apiRequest } from '../services/api';
+import { useOutletContext } from 'react-router-dom';
 
-const EventList = ({ showMyEvents = false }) => {
+const EventList = ({ showMyEvents = false, showFavoritesOnly = false }) => {
   const { user, isLoaded, isSignedIn } = useUser();
+  const { favorites } = useOutletContext();
 
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
 
-      const data = await apiRequest('/api/events');
+        const data = await apiRequest('/api/events');
 
-      let filteredEvents = data || [];
+        let filteredEvents = data || [];
 
-      if (showMyEvents) {
-        const userEmail = user?.primaryEmailAddress?.emailAddress;
+        if (showMyEvents) {
+          const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-        filteredEvents = filteredEvents.filter(
-          (event) => event.user_email === userEmail
-        );
+          filteredEvents = filteredEvents.filter(
+            (event) => event.user_email === userEmail
+          );
+        }
+
+        if (showFavoritesOnly) {
+          filteredEvents = filteredEvents.filter((event) =>
+            favorites.includes(String(event.id))
+          );
+        }
+
+        setEvents(filteredEvents);
+      } catch (err) {
+        console.error('Error fetching events:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setEvents(filteredEvents);
-    } catch (err) {
-      console.error('Error fetching events:', err);
-      setError(err.message);
-    } finally {
+    if (!isLoaded) return;
+
+    if (showMyEvents && !isSignedIn) {
+      setEvents([]);
       setLoading(false);
+      return;
     }
-  };
 
-  if (!isLoaded) return;
-
-  if (showMyEvents && !isSignedIn) {
-    setEvents([]);
-    setLoading(false);
-    return;
-  }
-
-  fetchEvents();
-}, [showMyEvents, isLoaded, isSignedIn, user]);
+    fetchEvents();
+  }, [showMyEvents, showFavoritesOnly, favorites, isLoaded, isSignedIn, user]);
 
   if (loading || !isLoaded) {
     return <p>Loading events...</p>;
@@ -60,14 +68,32 @@ const EventList = ({ showMyEvents = false }) => {
   }
 
   if (events.length === 0) {
-    return <p>{showMyEvents ? 'You have not created any events yet.' : 'No events found.'}</p>;
+    if (showFavoritesOnly) {
+      return <p>You have no favorite events yet.</p>;
+    }
+
+    return (
+      <p>
+        {showMyEvents
+          ? 'You have not created any events yet.'
+          : 'No events found.'}
+      </p>
+    );
   }
 
   return (
     <section className="list">
-      {events.map((event) => (
-        <EventPreview key={event.id} event={event} />
-      ))}
+      {events.map((event) => {
+        const isFavorite = favorites.includes(String(event.id));
+
+        return (
+          <EventPreview
+            key={event.id}
+            event={event}
+            isFavorite={isFavorite}
+          />
+        );
+      })}
     </section>
   );
 };

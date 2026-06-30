@@ -749,3 +749,111 @@ letter-spacing: 1px;
   text-decoration: none;
   color: inherit;
 }
+
+.favorite-event-btn {
+  border: none;
+  background-color: #f59e0b;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.favorite-event-btn:hover {
+  background-color: #d97706;
+}
+.about-page {
+  min-height: 80vh;
+  padding: 60px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.about-box {
+  max-width: 750px;
+  padding: 40px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.about-tag {
+  color: #6366f1;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.about-box h1 {
+  font-size: 42px;
+  margin-bottom: 18px;
+}
+
+.about-box p {
+  color: #555;
+  font-size: 17px;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+
+.about-actions {
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.about-btn {
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: #6366f1;
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.about-btn.secondary {
+  background: #111827;
+}
+@media (max-width: 768px) {
+  header {
+    height: auto !important;
+    min-height: auto !important;
+    padding: 18px 24px 22px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 14px !important;
+    background-color: #d6bd8f !important;
+    overflow: visible !important;
+  }
+
+  header a {
+    text-decoration: none;
+  }
+
+  header .logo {
+    font-size: 32px !important;
+  }
+
+  header nav {
+    width: 100% !important;
+    order: 3 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 20px !important;
+    padding-top: 8px !important;
+  }
+
+  header nav .menu__link {
+    color: white !important;
+    font-size: 16px !important;
+    white-space: nowrap !important;
+  }
+}
