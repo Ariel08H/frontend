@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
+import './App2.css';
 import { Outlet, Route, Routes } from 'react-router-dom';
 
 import Home from './pages/Home';
@@ -38,6 +39,7 @@ function App() {
         <Route path="/showcase" element={<ShowcasePage />} />
         <Route path="/event/:id" element={<EventDetailsPage />} />
         <Route path="/favorites" element={<EventList showFavoritesOnly={true} />} />
+        <Route path="/past-events" element={<EventList showPastEvents={true} />} />
       </Route>
     </Routes>
   );
