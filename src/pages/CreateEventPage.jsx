@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { useUser } from '@clerk/react';
+import { useAuth, useUser } from '@clerk/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../services/api';
 
-const CreateProject = () => {
+const CreateEventPage = () => {
+  const { getToken } = useAuth();
   const { user, isSignedIn, isLoaded } = useUser();
+
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -68,10 +70,15 @@ const CreateProject = () => {
 
         const data = await apiRequest(`/api/events/${id}`);
 
-        const loggedInUserEmail = user?.primaryEmailAddress?.emailAddress;
+        const loggedInUserEmail =
+          user?.primaryEmailAddress?.emailAddress;
+
         const eventCreatorEmail = data.user_email;
 
-        if (!loggedInUserEmail || loggedInUserEmail !== eventCreatorEmail) {
+        if (
+          !loggedInUserEmail ||
+          loggedInUserEmail !== eventCreatorEmail
+        ) {
           setAccessDenied(true);
           return;
         }
@@ -83,12 +90,18 @@ const CreateProject = () => {
         setLocation(data.location || '');
         setIsImportant(Boolean(data.isImportant));
 
-        const dateTimeParts = splitDateTime(data.date || data.last_date);
+        const dateTimeParts = splitDateTime(
+          data.date || data.last_date
+        );
+
         setEventDate(dateTimeParts.date);
         setEventTime(dateTimeParts.time);
       } catch (error) {
         console.error('Error loading event for edit:', error);
-        setErrorMsg(error.message || 'Server error while loading event');
+
+        setErrorMsg(
+          error.message || 'Server error while loading event'
+        );
       } finally {
         setPageLoading(false);
       }
@@ -102,14 +115,26 @@ const CreateProject = () => {
 
     if (!trimmedUrl) return '';
 
-    if (
+    const urlWithProtocol =
       trimmedUrl.startsWith('http://') ||
       trimmedUrl.startsWith('https://')
-    ) {
-      return trimmedUrl;
-    }
+        ? trimmedUrl
+        : `https://${trimmedUrl}`;
 
-    return `https://${trimmedUrl}`;
+    try {
+      const parsedUrl = new URL(urlWithProtocol);
+
+      if (
+        parsedUrl.protocol !== 'http:' &&
+        parsedUrl.protocol !== 'https:'
+      ) {
+        return '';
+      }
+
+      return parsedUrl.toString();
+    } catch {
+      return '';
+    }
   };
 
   const submitForm = async (e) => {
@@ -127,21 +152,24 @@ const CreateProject = () => {
       return;
     }
 
+    const normalizedWebsite = normalizeWebsiteUrl(website);
+
+    if (!normalizedWebsite) {
+      setErrorMsg('Please enter a valid website URL.');
+      return;
+    }
+
     const combinedEventDate = `${eventDate}T${eventTime}`;
 
     const eventData = {
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       img,
-      website: normalizeWebsiteUrl(website),
-      location,
+      website: normalizedWebsite,
+      location: location.trim(),
       isImportant,
       last_date: combinedEventDate,
-      author: user?.fullName || 'Anonymous',
-      user_email: user?.primaryEmailAddress?.emailAddress,
     };
-
-    console.log('Data being sent to Backend:', eventData);
 
     try {
       setIsSubmitting(true);
@@ -153,54 +181,93 @@ const CreateProject = () => {
 
       const method = isEditMode ? 'PUT' : 'POST';
 
-      const data = await apiRequest(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
+      await apiRequest(
+        endpoint,
+        {
+          method,
+          body: JSON.stringify(eventData),
         },
-        body: JSON.stringify(eventData),
-      });
-
-      console.log(
-        isEditMode ? 'Event updated successfully:' : 'Event saved successfully:',
-        data
+        getToken
       );
 
       navigate('/');
     } catch (error) {
       console.error('Error sending event data:', error);
-      setErrorMsg(error.message || 'Server error while saving event');
+
+      setErrorMsg(
+        error.message || 'Server error while saving event'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleFileChange = async (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
+
     if (!file) return;
 
+    const allowedImageTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ];
+
+    const maxImageSize = 5 * 1024 * 1024;
+
+    if (!allowedImageTypes.includes(file.type)) {
+      setErrorMsg(
+        'Only JPG, PNG and WebP images are allowed.'
+      );
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxImageSize) {
+      setErrorMsg('The image must be smaller than 5 MB.');
+      event.target.value = '';
+      return;
+    }
+
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      setErrorMsg('');
+
+      const extensionByType = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+      };
+
+      const fileExtension = extensionByType[file.type];
+      const fileName = `${crypto.randomUUID()}.${fileExtension}`;
       const filePath = `uploads/${fileName}`;
 
       const { error } = await supabase.storage
         .from('event-img')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: false,
+        });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       const { data: urlData } = supabase.storage
         .from('event-img')
         .getPublicUrl(filePath);
 
-      const publicUrl = urlData.publicUrl;
-      setImg(publicUrl);
+      if (!urlData?.publicUrl) {
+        throw new Error('Could not create the image URL.');
+      }
 
-      console.log('Image URL:', publicUrl);
+      setImg(urlData.publicUrl);
     } catch (error) {
-      console.error('Image upload error:', error.message);
-      alert('Image upload failed. Check the console.');
+      console.error('Image upload error:', error);
+
+      setErrorMsg(
+        error.message || 'Image upload failed.'
+      );
     }
   };
 
@@ -208,8 +275,12 @@ const CreateProject = () => {
     return (
       <div className="auth-status-wrapper">
         <div className="auth-status-card">
-          <div className="auth-loader"></div>
-          <h2 className="auth-status-title">טוען נתוני משתמש...</h2>
+          <div className="auth-loader" />
+
+          <h2 className="auth-status-title">
+            טוען נתוני משתמש...
+          </h2>
+
           <p className="auth-status-text">אנא המתן רגע</p>
         </div>
       </div>
@@ -221,8 +292,10 @@ const CreateProject = () => {
       <div className="auth-status-wrapper">
         <div className="auth-status-card">
           <h2 className="auth-status-title">גישה מוגבלת</h2>
+
           <p className="auth-status-text">
-            עליך להיות מחובר כדי {isEditMode ? 'לערוך אירוע' : 'ליצור אירוע'}
+            עליך להיות מחובר כדי{' '}
+            {isEditMode ? 'לערוך אירוע' : 'ליצור אירוע'}
           </p>
         </div>
       </div>
@@ -233,8 +306,12 @@ const CreateProject = () => {
     return (
       <div className="auth-status-wrapper">
         <div className="auth-status-card">
-          <div className="auth-loader"></div>
-          <h2 className="auth-status-title">Loading event...</h2>
+          <div className="auth-loader" />
+
+          <h2 className="auth-status-title">
+            Loading event...
+          </h2>
+
           <p className="auth-status-text">Please wait</p>
         </div>
       </div>
@@ -245,9 +322,13 @@ const CreateProject = () => {
     return (
       <div className="auth-status-wrapper">
         <div className="auth-status-card">
-          <h2 className="auth-status-title">Access Denied</h2>
+          <h2 className="auth-status-title">
+            Access Denied
+          </h2>
+
           <p className="auth-status-text">
-            You cannot edit this event because it was created by another user.
+            You cannot edit this event because it was created
+            by another user.
           </p>
         </div>
       </div>
@@ -258,57 +339,84 @@ const CreateProject = () => {
     <div className="create-page">
       <div className="create-card">
         <h1 className="create-title">
-          {isEditMode ? 'Update Event' : 'Create a New Event'}
+          {isEditMode
+            ? 'Update Event'
+            : 'Create a New Event'}
         </h1>
 
         {errorMsg && (
-          <p className="form-error-message">
-            {errorMsg}
-          </p>
+          <p className="form-error-message">{errorMsg}</p>
         )}
 
-        <form onSubmit={submitForm} className="create-form">
+        <form
+          onSubmit={submitForm}
+          className="create-form"
+        >
           <div className="form-div">
-            <label>Event Title</label>
+            <label htmlFor="event-title">
+              Event Title
+            </label>
+
             <input
+              id="event-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="E.g. Music Festival"
+              maxLength={120}
               required
             />
           </div>
 
           <div className="form-div">
-            <label>Event Description</label>
+            <label htmlFor="event-description">
+              Event Description
+            </label>
+
             <textarea
+              id="event-description"
               rows={5}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
               placeholder="Tell us about your event..."
+              maxLength={3000}
               required
             />
           </div>
 
           <div className="form-row">
             <div className="form-div">
-              <label>Website Link</label>
+              <label htmlFor="event-website">
+                Website Link
+              </label>
+
               <input
+                id="event-website"
                 type="text"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="https://myevent.com"
+                maxLength={2048}
                 required
               />
             </div>
 
             <div className="form-div">
-              <label>Location</label>
+              <label htmlFor="event-location">
+                Location
+              </label>
+
               <input
+                id="event-location"
                 type="text"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) =>
+                  setLocation(e.target.value)
+                }
                 placeholder="E.g. Tel Aviv, Israel"
+                maxLength={200}
                 required
               />
             </div>
@@ -316,40 +424,58 @@ const CreateProject = () => {
 
           <div className="form-row">
             <div className="form-div">
-              <label>Date</label>
+              <label htmlFor="event-date">Date</label>
+
               <input
+                id="event-date"
                 type="date"
                 value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
+                onChange={(e) =>
+                  setEventDate(e.target.value)
+                }
                 required
               />
             </div>
 
             <div className="form-div">
-              <label>Time</label>
+              <label htmlFor="event-time">Time</label>
+
               <input
+                id="event-time"
                 type="time"
                 value={eventTime}
-                onChange={(e) => setEventTime(e.target.value)}
+                onChange={(e) =>
+                  setEventTime(e.target.value)
+                }
                 required
               />
             </div>
           </div>
 
           <div className="important-row">
-            <label>Is Important</label>
+            <label htmlFor="event-important">
+              Is Important
+            </label>
+
             <input
+              id="event-important"
               type="checkbox"
               checked={isImportant}
-              onChange={(e) => setIsImportant(e.target.checked)}
+              onChange={(e) =>
+                setIsImportant(e.target.checked)
+              }
             />
           </div>
 
           <div className="form-div">
-            <label>Event Image</label>
+            <label htmlFor="event-image">
+              Event Image
+            </label>
+
             <input
+              id="event-image"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleFileChange}
             />
 
@@ -393,4 +519,4 @@ const CreateProject = () => {
   );
 };
 
-export default CreateProject;
+export default CreateEventPage;

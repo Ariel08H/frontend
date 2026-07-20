@@ -1,21 +1,54 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export const apiRequest = async (endpoint, options = {}) => {
+export const apiRequest = async (
+  endpoint,
+  options = {},
+  getToken = null
+) => {
+  const normalizedEndpoint = endpoint.startsWith('/')
+    ? endpoint
+    : `/${endpoint}`;
 
-    // מוודא שהאנדפוינט מתחיל בסלאש
+  const url = `${BASE_URL}${normalizedEndpoint}`;
 
-    const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  const headers = new Headers(options.headers || {});
 
-    console.log('🎯 Attempting to fetch from:', url);
+  if (getToken) {
+    const token = await getToken();
 
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-
-        throw new Error(`API error: ${response.status}`);
-
+    if (!token) {
+      throw new Error('You must be signed in to perform this action.');
     }
 
-    return response.json();
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const errorMessage =
+      data?.message ||
+      data?.error ||
+      `API error: ${response.status}`;
+
+    throw new Error(errorMessage);
+  }
+
+  return data;
 };
