@@ -26,7 +26,6 @@ const CreateEventPage = () => {
   const [pageLoading, setPageLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [accessDenied, setAccessDenied] = useState(false);
 
   const splitDateTime = (dateValue) => {
     if (!dateValue) {
@@ -60,26 +59,30 @@ const CreateEventPage = () => {
   useEffect(() => {
     if (!isEditMode) return;
     if (!isLoaded) return;
-    if (!isSignedIn) return;
+
+    if (!isSignedIn) {
+      navigate('/', { replace: true });
+      return;
+    }
 
     const fetchEventForEdit = async () => {
       try {
         setPageLoading(true);
         setErrorMsg('');
-        setAccessDenied(false);
 
         const data = await apiRequest(`/api/events/${id}`);
 
         const loggedInUserEmail =
-          user?.primaryEmailAddress?.emailAddress;
+          user?.primaryEmailAddress?.emailAddress?.toLowerCase();
 
-        const eventCreatorEmail = data.user_email;
+        const eventCreatorEmail =
+          data.user_email?.toLowerCase();
 
         if (
           !loggedInUserEmail ||
           loggedInUserEmail !== eventCreatorEmail
         ) {
-          setAccessDenied(true);
+          navigate('/', { replace: true });
           return;
         }
 
@@ -108,7 +111,14 @@ const CreateEventPage = () => {
     };
 
     fetchEventForEdit();
-  }, [id, isEditMode, isLoaded, isSignedIn, user]);
+  }, [
+    id,
+    isEditMode,
+    isLoaded,
+    isSignedIn,
+    user,
+    navigate,
+  ]);
 
   const normalizeWebsiteUrl = (url) => {
     const trimmedUrl = url.trim();
@@ -288,18 +298,7 @@ const CreateEventPage = () => {
   }
 
   if (!isSignedIn) {
-    return (
-      <div className="auth-status-wrapper">
-        <div className="auth-status-card">
-          <h2 className="auth-status-title">גישה מוגבלת</h2>
-
-          <p className="auth-status-text">
-            עליך להיות מחובר כדי{' '}
-            {isEditMode ? 'לערוך אירוע' : 'ליצור אירוע'}
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (pageLoading) {
@@ -313,23 +312,6 @@ const CreateEventPage = () => {
           </h2>
 
           <p className="auth-status-text">Please wait</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (accessDenied) {
-    return (
-      <div className="auth-status-wrapper">
-        <div className="auth-status-card">
-          <h2 className="auth-status-title">
-            Access Denied
-          </h2>
-
-          <p className="auth-status-text">
-            You cannot edit this event because it was created
-            by another user.
-          </p>
         </div>
       </div>
     );
